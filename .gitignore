@@ -1,0 +1,41 @@
+# ── Compiled output ──────────────────────────────────────────
+out/
+*.js.map
+
+# ── Dependencies ─────────────────────────────────────────────
+node_modules/
+
+# ── Packaged extension ────────────────────────────────────────
+*.vsix
+
+# ── VS Code local settings ───────────────────────────────────
+.vscode/settings.json
+.vscode/launch.json
+.vscode/tasks.json
+.vscode/extensions.json
+!.vscode/
+
+# ── OS files ─────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Logs ─────────────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── Environment / secrets ────────────────────────────────────
+.env
+.env.local
+.env.*
+
+# ── Test output ──────────────────────────────────────────────
+.vscode-test/
+coverage/
+
+# ── Misc ─────────────────────────────────────────────────────
+*.tgz
+.yarn-integrity
