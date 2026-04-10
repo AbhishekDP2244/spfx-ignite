@@ -3,10 +3,29 @@
   "displayName": "Gulp Runner",
   "description": "Run Gulp build pipelines from a chatbot-style UI panel",
   "version": "0.0.1",
+  "publisher": "AbhishekDP2244",
   "engines": {
     "vscode": "^1.85.0"
   },
-  "categories": ["Other"],
+  "keywords": [
+    "spfx",
+    "gulp",
+    "sharepoint",
+    "build",
+    "pipeline"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AbhishekDP2244/spfx-ignite"
+  },
+  "icon": "media/icon.png",
+  "galleryBanner": {
+    "color": "#1e1e1e",
+    "theme": "dark"
+  },
+  "categories": [
+    "Other"
+  ],
   "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
