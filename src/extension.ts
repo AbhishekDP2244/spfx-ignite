@@ -13,6 +13,17 @@ interface HistoryEntry {
   steps: { name: string; duration: string; status: string }[];
 }
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function getNonce(): string {
+  let text = "";
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  for (let i = 0; i < 32; i++) {
+    text += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return text;
+}
+
 // ── Activate ─────────────────────────────────────────────────────────────────
 
 export function activate(context: vscode.ExtensionContext) {
@@ -58,7 +69,6 @@ class GulpRunnerViewProvider implements vscode.WebviewViewProvider {
       enableScripts: true,
       localResourceRoots: [this._extensionUri],
     };
-    webviewView.webview.html = this._getHtml();
 
     webviewView.webview.onDidReceiveMessage(async (data) => {
       switch (data.type) {
@@ -98,6 +108,8 @@ class GulpRunnerViewProvider implements vscode.WebviewViewProvider {
           break;
       }
     });
+
+    webviewView.webview.html = this._getHtml(webviewView.webview);
   }
 
   // ── Workspace auto-detect ─────────────────────────────────────────────────
@@ -228,6 +240,7 @@ class GulpRunnerViewProvider implements vscode.WebviewViewProvider {
   ): Promise<boolean> {
     return new Promise((resolve) => {
       this._postMessage("step", label);
+      const stepStart = Date.now();
 
       const proc = cp.spawn(cmd, [], {
         cwd,
@@ -262,17 +275,17 @@ class GulpRunnerViewProvider implements vscode.WebviewViewProvider {
 
       proc.on("close", (code) => {
         this._runningProcess = undefined;
-        const duration = this._formatDuration(Date.now() - Date.now());
+        const duration = this._formatDuration(Date.now() - stepStart);
         if (code === 0) {
           this._postMessage(
             "stepDone",
-            JSON.stringify({ label, duration: "" }),
+            JSON.stringify({ label, duration }),
           );
           resolve(true);
         } else {
           this._postMessage(
             "stepFailed",
-            JSON.stringify({ label, duration: "" }),
+            JSON.stringify({ label, duration }),
           );
           if (errors.length > 0) {
             const topErrors = errors.slice(-10);
@@ -438,12 +451,14 @@ class GulpRunnerViewProvider implements vscode.WebviewViewProvider {
 
   // ── Webview HTML ──────────────────────────────────────────────────────────
 
-  private _getHtml(): string {
+  private _getHtml(webview: vscode.Webview): string {
+    const nonce = getNonce();
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
 <title>Gulp Runner</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -634,10 +649,10 @@ body {
 <!-- 3. Actions -->
 <div class="section">
   <div class="section-title">⚡ Actions</div>
-  <button class="btn btn-primary"   id="btnBuild"   onclick="send('runBuildUIPackage')">🔥 Build UI Package</button>
-  <button class="btn btn-watch"     id="btnWatch"   onclick="send('toggleWatch')">👁 Start Watch Mode</button>
-  <button class="btn btn-secondary" id="btnInstall" onclick="send('runNpmInstall')">📦 NPM Install</button>
-  <button class="btn btn-secondary" id="btnClean"   onclick="send('runCleanModules')" style="color:#ffaaaa">🗑 Clean Node Modules</button>
+  <button class="btn btn-primary"   id="btnBuild">🔥 Build UI Package</button>
+  <button class="btn btn-watch"     id="btnWatch">👁 Start Watch Mode</button>
+  <button class="btn btn-secondary" id="btnInstall">📦 NPM Install</button>
+  <button class="btn btn-secondary" id="btnClean"   style="color:#ffaaaa">🗑 Clean Node Modules</button>
 </div>
 
 <!-- 4. Pipeline Stepper -->
@@ -650,14 +665,14 @@ body {
 <div class="section" style="flex-shrink:0">
   <div class="section-title">
     📋 Log
-    <button class="clear-btn" onclick="clearLog()">clear</button>
+    <button class="clear-btn" id="btnClearLog">clear</button>
   </div>
   <div class="chat-area" id="chatArea">
     <div class="empty-log" id="emptyLog">No output yet</div>
   </div>
   <div id="errorSummaryBox" style="display:none; padding: 0 0 4px"></div>
   <div style="padding: 4px 0 2px; display:none" id="cancelBar">
-    <button class="btn btn-danger" onclick="send('cancelRun')">⛔ Cancel</button>
+    <button class="btn btn-danger" id="btnCancel">⛔ Cancel</button>
   </div>
 </div>
 
@@ -665,14 +680,14 @@ body {
 <div class="section" style="flex-shrink:0; padding-bottom: 10px">
   <div class="section-title">
     🕐 History
-    <button class="clear-btn" onclick="send('clearHistory')">clear</button>
+    <button class="clear-btn" id="btnClearHistory">clear</button>
   </div>
   <div class="history-list" id="historyList">
     <div class="history-empty">No runs yet</div>
   </div>
 </div>
 
-<script>
+<script nonce="${nonce}">
 const vscode      = acquireVsCodeApi();
 const chatArea    = document.getElementById('chatArea');
 const cancelBar   = document.getElementById('cancelBar');
@@ -691,6 +706,14 @@ let stepNodes = [];
 let stepMap   = {};
 
 function send(type) { vscode.postMessage({ type }); }
+
+document.getElementById('btnBuild').addEventListener('click', () => send('runBuildUIPackage'));
+document.getElementById('btnWatch').addEventListener('click', () => send('toggleWatch'));
+document.getElementById('btnInstall').addEventListener('click', () => send('runNpmInstall'));
+document.getElementById('btnClean').addEventListener('click', () => send('runCleanModules'));
+document.getElementById('btnCancel').addEventListener('click', () => send('cancelRun'));
+document.getElementById('btnClearLog').addEventListener('click', () => clearLog());
+document.getElementById('btnClearHistory').addEventListener('click', () => send('clearHistory'));
 
 function setRunning(val) {
   [btnBuild, btnInstall, btnClean].forEach(b => b.disabled = val);
@@ -866,13 +889,18 @@ window.addEventListener('message', ({ data }) => {
   }
 });
 
+historyList.addEventListener('click', function(e) {
+  const item = e.target.closest('.history-item');
+  if (item) item.classList.toggle('expanded');
+});
+
 function renderHistory(history) {
   if (!history.length) {
     historyList.innerHTML = '<div class="history-empty">No runs yet</div>';
     return;
   }
   historyList.innerHTML = history.map(function(h) {
-    return '<div class="history-item ' + h.status + '" onclick="this.classList.toggle(\'expanded\')">' +
+    return '<div class="history-item ' + h.status + '">' +
       '<div class="history-row">' +
         '<span class="history-name">' + esc(h.label) + '</span>' +
         '<span class="history-dur">' + esc(h.duration) + '</span>' +
